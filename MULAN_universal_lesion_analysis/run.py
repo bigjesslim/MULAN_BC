@@ -34,13 +34,17 @@ if len(os.path.dirname(__file__)) > 0:
 
 
 def main():
+    # config - configs are from 2 sources:(1) maskrcnn.config.defaults.py, (2) config.yml 
+    # (for common dict keys, config.yml overrides the defaults)
     config_file = 'config.yml'
     cfg_new = cfg_from_file(config_file)
     merge_a_into_b(cfg_new, cfg)
 
-    log_dir = cfg.LOGFILE_DIR
+    log_dir = cfg.LOGFILE_DIR # logs folder
     logger = setup_logger("maskrcnn", log_dir, cfg.EXP_NAME, get_rank())
 
+    # set up new demo/batch configurations in cfg_test and
+    # modify some old attributes in cfg accordingly
     if cfg.MODE in ('demo', 'batch'):
         cfg_test = merge_test_config()
         logger.info(pprint.pformat(cfg_test))
@@ -49,6 +53,7 @@ def main():
         logger.info(pprint.pformat(cfg_new))
     check_configs()
 
+    # GPU setup
     cfg.runtime_info.local_rank = 0
     os.environ["CUDA_VISIBLE_DEVICES"] = cfg.GPU
     num_gpus = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
@@ -59,6 +64,7 @@ def main():
 
     logger.info("Using {} GPUs".format(num_gpus))
 
+    # training + set seed
     if cfg.MODE in ('train',) and cfg.SEED is not None:
         random.seed(cfg.SEED)
         torch.manual_seed(cfg.SEED)
@@ -115,7 +121,7 @@ def merge_test_config():
     cfg_new = cfg_from_file(config_file)
     # cfg.GPU = cfg_new.GPU
     cfg.TEST.TEST_SLICE_INTV_MM = cfg_new.TEST_SLICE_INTV_MM
-    cfg.TEST.VISUALIZE.SCORE_THRESH = cfg_new.DETECTION_SCORE_THRESH
+    cfg.TEST.TEST_SLICE_INTV_MM= cfg_new.DETECTION_SCORE_THRESH
     cfg.TEST.VISUALIZE.DETECTIONS_PER_IMG = cfg_new.MAX_DETECTIONS_PER_IMG
     cfg.TEST.MIN_LYMPH_NODE_DIAM = cfg_new.MIN_LYMPH_NODE_DIAM_TO_SHOW
     cfg.TEST.MASK.THRESHOLD = cfg_new.MASK_THRESHOLD
