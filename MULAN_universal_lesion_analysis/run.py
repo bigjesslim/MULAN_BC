@@ -1,5 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-r"""
+"""
 Basic run script for PyTorch
 """
 
@@ -121,7 +121,7 @@ def merge_test_config():
     cfg_new = cfg_from_file(config_file)
     # cfg.GPU = cfg_new.GPU
     cfg.TEST.TEST_SLICE_INTV_MM = cfg_new.TEST_SLICE_INTV_MM
-    cfg.TEST.TEST_SLICE_INTV_MM= cfg_new.DETECTION_SCORE_THRESH
+    cfg.TEST.VISUALIZE.SCORE_THRESH = cfg_new.DETECTION_SCORE_THRESH
     cfg.TEST.VISUALIZE.DETECTIONS_PER_IMG = cfg_new.MAX_DETECTIONS_PER_IMG
     cfg.TEST.MIN_LYMPH_NODE_DIAM = cfg_new.MIN_LYMPH_NODE_DIAM_TO_SHOW
     cfg.TEST.MASK.THRESHOLD = cfg_new.MASK_THRESHOLD
