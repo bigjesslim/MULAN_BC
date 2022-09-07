@@ -1,0 +1,11 @@
+conda install -c conda-forge matplotlib
+conda install -c conda-forge easydict
+conda install -c conda-forge pyyaml
+conda install -c conda-forge nibabel
+conda install -c anaconda cffi
+conda install -c anaconda openpyxl
+conda install -c anaconda scikit-learn
+conda install -c anaconda scipy
+conda install -c conda-forge tqdm
+conda install -c conda-forge gputil
+conda install -c conda-forge pycocotools
