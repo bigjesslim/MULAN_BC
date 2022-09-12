@@ -9,7 +9,7 @@ import os
 
 
 class DatasetCatalog(object):
-    DATA_DIR = "/data/"
+    DATA_DIR = "/home/tester/jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/"
     DATASETS = {
         "DeepLesion_train": {
             "data_dir": "DeepLesion/Images_png",
@@ -28,6 +28,11 @@ class DatasetCatalog(object):
         },
         "DeepLesion_small": {  # for debug
             "data_dir": "DeepLesion/Images_png",
+            "split": "small",
+            "ann_file": "DeepLesion/DL_info.csv"
+        },
+        "DeepLesion_mini": {  # for debug
+            "data_dir": "DeepLesion/minideeplesion",
             "split": "small",
             "ann_file": "DeepLesion/DL_info.csv"
         },

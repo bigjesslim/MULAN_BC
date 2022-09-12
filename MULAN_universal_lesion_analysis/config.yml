@@ -20,7 +20,7 @@ SOLVER:
   CLIP_GRADIENT: 10.
 
 DATASETS:  # config your dataset paths in paths_catalog.py
-  TRAIN: ["DeepLesion_train"]
+  TRAIN: ["DeepLesion_mini"]
   VAL: ["DeepLesion_val"]
   TEST: ["DeepLesion_test"]
   TAG:
@@ -47,9 +47,9 @@ DATALOADER:
 MODEL:
   # fuse feature maps of neighboring CT slices at the final level of the backbone and FEATURE_FUSION_LEVELS
   USE_3D_FUSION: True
-  TAG_ON: True
+  TAG_ON: False
   MASK_ON: True
-  REFINE_ON: True
+  REFINE_ON: False
 
   META_ARCHITECTURE: "GeneralizedRCNN"
   INIT_FROM_PRETRAIN: True  # whether use ImageNet pretrained weights

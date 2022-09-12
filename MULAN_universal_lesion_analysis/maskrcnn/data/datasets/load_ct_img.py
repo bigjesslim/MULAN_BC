@@ -67,7 +67,9 @@ def load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_sli
         # in this case, data_dir is the numpy volume and imname is the slice index
         vol = data_dir
         idx = min(vol.shape[2]-1, max(int(imname+delta), 0))
-        return vol[:,:,idx]
+        final_vol = vol[:,:,idx]
+        #print(final_vol.shape)
+        return final_vol
 
     if isinstance(data_dir, str) and isinstance(imname, str):
         _load_data = _load_data_from_png

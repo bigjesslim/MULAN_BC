@@ -35,8 +35,8 @@ _C.MODEL.META_ARCHITECTURE = "GeneralizedRCNN"
 # If the WEIGHT starts with a catalog://, like :R-50, the code will look for
 # the path in paths_catalog. Else, it will use it as the specified absolute
 # path
-# _C.MODEL.WEIGHT = ""
-_C.MODEL.WEIGHT = "catalog://ImageNetPretrained/MSRA/R-50"
+_C.MODEL.WEIGHT = "/home/tester/jessica/MULAN_BC/MULAN_universal_lesion_analysis/MULAN_DeepLesion_epoch_08.pth"
+#_C.MODEL.WEIGHT = "catalog://ImageNetPretrained/MSRA/R-50"
 _C.MODEL.INIT_FROM_PRETRAIN = True
 
 # -----------------------------------------------------------------------------
@@ -325,5 +325,5 @@ def merge_a_into_b(a, b):
 def cfg_from_file(filename):
     """Load a config file and merge it into the default options."""
     with open(filename, 'r') as f:  # not valid grammar in Python 2.5
-        yaml_cfg = edict(yaml.load(f))
+        yaml_cfg = edict(yaml.safe_load(f))
     return yaml_cfg

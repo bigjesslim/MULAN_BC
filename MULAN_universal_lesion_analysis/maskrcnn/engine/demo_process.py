@@ -6,6 +6,7 @@ import numpy as np
 from time import time
 import torch
 import nibabel as nib
+import nrrd
 from tqdm import tqdm
 import cv2
 from openpyxl import load_workbook
@@ -20,23 +21,31 @@ from maskrcnn.utils.draw import draw_results
 
 def exec_model(model):
     """test model on user-provided data, instead of the preset DeepLesion dataset"""
-    import_tag_data()
+    if cfg.MODEL.TAG_ON:
+        import_tag_data()
     model.eval()
     device = torch.device(cfg.MODEL.DEVICE)
 
     while True:
-        info = "Please input the path of a nifti CT volume >> "
+        info = "Please input the path of a nifti or nrrd CT volume >> "
         while True:
             path = input(info)
             if not os.path.exists(path):
                 print('file does not exist!')
                 continue
-            try:
-                print('reading image ...')
+            # try:
+            print(path)
+            if path.split(".")[-1] == 'nrrd':
+                print('reading nrrd file ...')
+                data_is_nrrd = True
+                nrrd_data = nrrd.read(path)
+                print(len(nrrd_data))
+            else:
+                print('reading nifti file ...')
                 nifti_data = nib.load(path)
-                break
-            except:
-                print('load nifti file error!')
+            break
+            # except:
+            #     print('load nifti file error!')
 
         while True:
             win_sel = input('Window to show, 1:soft tissue, 2:lung, 3: bone >> ')
@@ -46,7 +55,10 @@ def exec_model(model):
             win_show = win_show[int(win_sel)-1]
             break
 
-        vol, spacing, slice_intv = load_preprocess_nifti(nifti_data)
+        if data_is_nrrd:
+            vol, spacing, slice_intv = load_preprocess_nrrd(nrrd_data)
+        else:
+            vol, spacing, slice_intv = load_preprocess_nifti(nifti_data)
             
         slice_num_per_run = max(1, int(float(cfg.TEST.TEST_SLICE_INTV_MM)/slice_intv+.5))
         num_total_slice = vol.shape[2]
@@ -102,10 +114,10 @@ def import_tag_data():
 
 
 def load_preprocess_nifti(data):
-    vol = (data.get_data().astype('int32') + 32768).astype('uint16')  # to be consistent with png files
+    vol = (data.get_fdata().astype('int32') + 32768).astype('uint16')  # to be consistent with png files
     # spacing = -data.get_affine()[0,1]
     # slice_intv = -data.get_affine()[2,2]
-    aff = data.get_affine()[:3, :3]
+    aff = data.affine[:3, :3]
     spacing = np.abs(aff[:2, :2]).max()
     slice_intv = np.abs(aff[2, 2])
 
@@ -120,6 +132,26 @@ def load_preprocess_nifti(data):
     if np.max(aff[1, :2]) > 0:
         vol = vol[:, ::-1, :]
     return vol, spacing, slice_intv
+
+def load_preprocess_nrrd(data):
+    vol = (data[0].astype('int32') + 32768).astype('uint16')  # to be consistent with png files
+    # spacing = -data.get_affine()[0,1]
+    # slice_intv = -data.get_affine()[2,2]
+    aff = data[1]['space directions'][:3, :3]
+    print(aff.shape)
+    spacing = np.abs(aff[:2, :2]).max()
+    slice_intv = np.abs(aff[2, 2])
+
+    # if np.abs(aff[0, 0]) > np.abs(aff[0, 1]):
+    #     vol = np.transpose(vol, (1, 0, 2))
+    #     aff = aff[[1, 0, 2], :]
+    # if np.max(aff[0, :2]) > 0:
+    #     vol = vol[::-1, :, :]
+    # if np.max(aff[1, :2]) > 0:
+    #     vol = vol[:, ::-1, :]
+
+    return vol, spacing, slice_intv
+
 
 
 def get_ims(slice_idx, vol, spacing, slice_intv):
@@ -143,16 +175,25 @@ def gen_output(im, result, info, win_show):
     pred = result.bbox.cpu().numpy()
     labels = result.get_field('labels').cpu().numpy()
     scores = result.get_field('scores').cpu().numpy()
-    tag_scores = result.get_field('tag_scores').cpu().numpy()
-    tag_predictions = result.get_field('tag_predictions').cpu().numpy()
+    if cfg.MODEL.TAG_ON:
+        tag_scores = result.get_field('tag_scores').cpu().numpy()
+        tag_predictions = result.get_field('tag_predictions').cpu().numpy()
+    else:
+        tag_scores = None
+        tag_predictions = None
 
-    mm2pix = info['im_scale'] / info['spacing'] * scale
-    contours = result.get_field('contour_mm').cpu().numpy() * mm2pix
-    contours = [c[c[:, 0] > 0, :] for c in contours]
-    contours = [c+1*scale for c in contours]  # there seems to be a small offset in the mask?
-    recists = result.get_field('recist_mm').cpu().numpy() * mm2pix
-    recists += 1*scale   # there seems to be a small offset in the mask?
-    diameters = result.get_field('diameter_mm').cpu().numpy()
+    if cfg.MODEL.MASK_ON:
+        mm2pix = info['im_scale'] / info['spacing'] * scale
+        contours = result.get_field('contour_mm').cpu().numpy() * mm2pix
+        contours = [c[c[:, 0] > 0, :] for c in contours]
+        contours = [c+1*scale for c in contours]  # there seems to be a small offset in the mask?
+        recists = result.get_field('recist_mm').cpu().numpy() * mm2pix
+        recists += 1*scale   # there seems to be a small offset in the mask?
+        diameters = result.get_field('diameter_mm').cpu().numpy()
+    else:
+        contours = None
+        recists = None
+        diameters = None
 
     pred *= scale
     overlay, msgs = draw_results(im, pred, labels, scores, tag_predictions=tag_predictions, tag_scores=tag_scores,
@@ -166,7 +207,14 @@ def print_msg_on_img(overlay, msgs):
     msg_im = np.zeros((txt_height*cfg.TEST.VISUALIZE.DETECTIONS_PER_IMG+10, overlay.shape[1], 3), dtype=np.uint8)
     for p in range(len(msgs)):
         msg = msgs[p].split(' | ')
-        msg = msg[0][7:10] + msg[1][:-2] + ': ' + msg[2]
+        print(*msg[0])
+        print(*msg[1])
+        if cfg.MODEL.TAG_ON: # detection + segmentation + tagging
+            msg = msg[0][7:10] + msg[1][:-2] + ': ' + msg[2]
+        elif cfg.MODEL.MASK_ON: # detection + segmentation
+            msg = msg[0][7:10] + msg[1][:-2]
+        else: # just detection
+            msg = msg[0][7:10]
         cv2.putText(msg_im, msg, (0, txt_height*(p+1)),
                     cv2.FONT_HERSHEY_DUPLEX, fontScale=.5,
                     color=(255,255,255), thickness=1)

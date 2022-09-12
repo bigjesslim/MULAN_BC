@@ -48,8 +48,9 @@ def train_model():
         if not cfg.MODEL.INIT_FROM_PRETRAIN:
             logger.info('No pretrained weights')
         else:
-            # extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
-            model.backbone.load_pretrained_weights()
+            # load pretrained deeplesion weights here
+            extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
+            # model.backbone.load_pretrained_weights()
     else:
         name = checkpointer.get_save_name(cfg.BEGIN_EPOCH, prefix=cfg.FINETUNE_FROM)
         extra_checkpoint_data = checkpointer.load(name)
