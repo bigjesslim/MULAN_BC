@@ -57,7 +57,9 @@ def main():
     cfg.runtime_info.local_rank = 0
     os.environ["CUDA_VISIBLE_DEVICES"] = cfg.GPU
     num_gpus = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
-    cfg.runtime_info.distributed = num_gpus > 1
+    # cfg.runtime_info.distributed = num_gpus > 1
+    # set distributed use to false due to resource constraints for ncc-ntu server 
+    cfg.runtime_info.distributed = False
     if cfg.runtime_info.distributed:
         torch.cuda.set_device(cfg.runtime_info.local_rank)
         torch.distributed.init_process_group(backend="nccl", init_method="env://")
