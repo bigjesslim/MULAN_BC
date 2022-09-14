@@ -121,6 +121,7 @@ class DeepLesionDataset(object):
         Returns:
             tuple: (image, target, info).
         """
+        # get info saved from external metadata source - (typically DL_info.csv)
         image_fn = self.image_fn_list[index]
         lesion_idx_grouped = self.lesion_idx_grouped[index]
         boxes0 = self.boxes[lesion_idx_grouped]
@@ -136,6 +137,7 @@ class DeepLesionDataset(object):
             age = .5
         z_coord = self.norm_location[lesion_idx_grouped[0], 2]
 
+        # default = 3*3 (in config.yml)
         num_slice = cfg.INPUT.NUM_SLICES * cfg.INPUT.NUM_IMAGES_3DCE
         is_train = self.split=='train'
         if is_train and cfg.INPUT.DATA_AUG_3D is not False:
@@ -266,7 +268,7 @@ class DeepLesionDataset(object):
         self.noisy = np.array([int(row[10]) > 0 for row in info])
         # self.slice_range = np.array([[int(x) for x in row[11].split(',')] for row in info])
         self.spacing3D = np.array([[float(x) for x in row[12].split(',')] for row in info])
-        self.spacing = self.spacing3D[:, 0]
+        self.spacing = self.spacing3D[:, 0] # real-world scale of each pixel
         self.slice_intv = self.spacing3D[:, 2]  # slice intervals
         # self.image_size = np.array([[int(x) for x in row[13].split(',')] for row in info])
         self.DICOM_window = np.array([[float(x) for x in row[14].split(',')] for row in info])
