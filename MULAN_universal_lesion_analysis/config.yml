@@ -32,7 +32,7 @@ DATASETS:  # config your dataset paths in paths_catalog.py
 INPUT:
   NORM_SPACING: .8  # first normalize image size to NORM_SPACING mm/pixel (so the smaller this value, the larger the image).
   MAX_IM_SIZE: 512  # then restrict the maximum image size to MAX_SIZE
-  IMG_DO_CLIP: True  # clip the black borders of CT images
+  IMG_DO_CLIP: False  # clip the black borders of CT images (not needed for BreastCT dataset)
   SLICE_INTV: 2  # slice interval in mm after interpolation. If 0, only use one slice thus no 3D context
   NUM_SLICES: 3  # multi-slice input (data-level fusion in 3DCE paper) to incorporate 3D context
   NUM_IMAGES_3DCE: 3  # number of 3-slice images for feature fusion
