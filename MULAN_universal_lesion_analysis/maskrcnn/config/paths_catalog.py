@@ -9,33 +9,38 @@ import os
 
 
 class DatasetCatalog(object):
-    DATA_DIR = "/home/tester/jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/"
+    DATA_DIR = "/home/tester/"
     DATASETS = {
         "DeepLesion_train": {
-            "data_dir": "DeepLesion/Images_png",
+            "data_dir": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/Images_png",
             "split": "train",
             "ann_file": "DeepLesion/DL_info.csv",
         },
         "DeepLesion_val": {
-            "data_dir": "DeepLesion/Images_png",
+            "data_dir": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/Images_png",
             "split": "val",
-            "ann_file": "DeepLesion/DL_info.csv"
+            "ann_file": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/DL_info.csv"
         },
         "DeepLesion_test": {
-            "data_dir": "DeepLesion/Images_png",
+            "data_dir": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/Images_png",
             "split": "test",
-            "ann_file": "DeepLesion/DL_info.csv"
+            "ann_file": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/DL_info.csv"
         },
         "DeepLesion_small": {  # for debug
-            "data_dir": "DeepLesion/Images_png",
+            "data_dir": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/Images_png",
             "split": "small",
             "ann_file": "DeepLesion/DL_info.csv"
         },
         "DeepLesion_mini": {  # for debug
-            "data_dir": "DeepLesion/minideeplesion",
+            "data_dir": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/minideeplesion",
             "split": "small",
-            "ann_file": "DeepLesion/DL_info.csv"
+            "ann_file": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/DL_info.csv"
         },
+        "BC_old_data":{
+            "data_dir": "Data",
+            "split": "train",
+            "ann_file": None
+        }
     }
 
     @staticmethod
