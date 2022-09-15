@@ -11,9 +11,10 @@ import nibabel as nib
 from maskrcnn.config import cfg
 
 
-def load_prep_img(data_dir, imname, spacing, slice_intv, do_clip=False, num_slice=3, is_train=False):
+def load_prep_img(data_dir, imname, spacing, slice_intv, do_clip=False, num_slice=3, is_train=False, load_from_nrrd=False):
     """load volume, windowing, interpolate multiple slices, clip black border, resize according to spacing"""
-    im, mask = load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_slice)
+
+    im, mask = load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_slice, load_from_nrrd)
 
     im = windowing(im, cfg.INPUT.WINDOWING)
 
@@ -29,7 +30,7 @@ def load_prep_img(data_dir, imname, spacing, slice_intv, do_clip=False, num_slic
         # mask = mask[c[0]:c[1] + 1, c[2]:c[3] + 1]
         # print(im.shape)
     else:
-        c = [0, im.shape[0]-1, 0, im.shape[1]-1]
+        c = [0, im.shape[0]-1, 0, im.shape[1]-1] # corner pixel ?
 
     im_shape = im.shape[0:2]
     if spacing is not None and cfg.INPUT.NORM_SPACING > 0:  # spacing adjust, will overwrite simple scaling
@@ -52,7 +53,7 @@ def load_prep_img(data_dir, imname, spacing, slice_intv, do_clip=False, num_slic
     return im, im_scale, c
 
 
-def load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_slice):
+def load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_slice, load_from_nrrd):
     data_cache = {}
     def _load_data_from_png(imname, delta=0):
         imname1 = get_slice_name(data_dir, imname, delta)
@@ -71,7 +72,17 @@ def load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_sli
         #print(final_vol.shape)
         return final_vol
 
-    if isinstance(data_dir, str) and isinstance(imname, str):
+    def _load_data_from_nrrd(imname, delta=0): 
+        # data_dir = whole CT volume
+        # imname = chosen slice index
+        vol = data_dir
+        idx = min(vol.shape[2]-1, max(int(imname+delta), 0)) # in case slice index is out of bounds
+        final_vol = vol[:,:,idx]
+        return final_vol
+
+    if load_from_nrrd:
+        _load_data = _load_data_from_nrrd
+    elif isinstance(data_dir, str) and isinstance(imname, str):
         _load_data = _load_data_from_png
     elif isinstance(data_dir, np.ndarray) and isinstance(imname, int):
         _load_data = _load_data_from_nifti
@@ -82,10 +93,9 @@ def load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_sli
 
     if cfg.INPUT.SLICE_INTV == 0 or np.isnan(slice_intv) or slice_intv < 0:
         ims = [im_cur] * num_slice  # only use the central slice
-
     else:
         ims = [im_cur]
-        # find neighboring slices of im_cure
+        # find neighboring slices of im_cur
         rel_pos = float(cfg.INPUT.SLICE_INTV) / slice_intv
         a = rel_pos - np.floor(rel_pos)
         b = np.ceil(rel_pos) - rel_pos

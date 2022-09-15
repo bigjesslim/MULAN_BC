@@ -56,7 +56,6 @@ class BreastCTDataset(object):
         # read image from nrrd file
         image_fn = self.image_fn_list[index]
         image, img_info =  nrrd.read(self.data_path + image_fn) 
-        image = np.transpose(image, (2, 0, 1))
         # lesion_idx_grouped = self.lesion_idx_grouped[index]
         
         # get some metadata details from metadata file
@@ -76,7 +75,7 @@ class BreastCTDataset(object):
 
         # get random slice from all slices with lesions
         chosen_slice_index = random.choice(lesion_slices)
-        image = image[chosen_slice_index]
+        #image = image[chosen_slice_index]
         mask = mask[chosen_slice_index]
 
         # get lesions from chosen mask
@@ -146,7 +145,7 @@ class BreastCTDataset(object):
                 index = x[0]*512 + x[1]
                 return index
             lesion_indexes = np.apply_along_axis(get_1d_index, 1, np_lesion)
-            lesion_mask = torch.zeros(P100_mask[0].shape)
+            lesion_mask = torch.zeros(mask[0].shape)
             tuple_lesion =tuple(torch.tensor(x) for x in lesion)
             lesion_mask.put_(torch.tensor(lesion_indexes), torch.ones(len(lesion_indexes)))
             masks.append(lesion_mask)
@@ -159,7 +158,7 @@ class BreastCTDataset(object):
         num_slice = cfg.INPUT.NUM_SLICES * cfg.INPUT.NUM_IMAGES_3DCE
         is_train = self.split =='train'
 
-        ## DATA AUG (online)
+        ## DATA AUG (online) - TODO: try training first - comment out first if the code fails (requires modification)
         if is_train and cfg.INPUT.DATA_AUG_3D is not False:
             slice_radius = diameters.min() / 2 * spacing / slice_intv * abs(cfg.INPUT.DATA_AUG_3D)  # lesion should not be too small
             slice_radius = int(slice_radius)
@@ -180,8 +179,8 @@ class BreastCTDataset(object):
                     image_fn = image_fn1
 
         # TODO: modify this function and how it gets neighbouring slices
-        im, im_scale, crop = load_prep_img(self.data_path, image_fn, spacing, slice_intv,
-                                           cfg.INPUT.IMG_DO_CLIP, num_slice=num_slice, is_train=is_train)
+        im, im_scale, crop = load_prep_img(image, chosen_slice_index, spacing, slice_intv,
+                                           cfg.INPUT.IMG_DO_CLIP, num_slice=num_slice, is_train=is_train, load_from_nrrd=True)
 
         im -= cfg.INPUT.PIXEL_MEAN
         # TODO: below is alr done before - check if need to do again or just remove
