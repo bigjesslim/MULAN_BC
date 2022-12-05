@@ -1,28 +1,30 @@
-EXP_NAME: "MULAN trained on DeepLesion"  # this name, together with "BEGIN_EPOCH", decides the file name of your checkpoint for training and inference
+EXP_NAME: "MULAN trained on BreastCT with Seg"  
 FINETUNE_FROM: ""  # useful in training. If "", same with EXP_NAME
-GPU: ''  # if "", choose the idlest GPU
-BEGIN_EPOCH: 8  # if = 0, start new training process; if > 0, load previous checkpoint according to FINETUNE_FROM
+GPU: '0'  # if "", choose the idlest GPU
+BEGIN_EPOCH: 11 # if = 0, start new training process; if > 0, load previous checkpoint according to FINETUNE_FROM
+# NOTE: EXP_NAME and BEGIN_EPOCH sets the checkpoint to load from 
 LOG_IN_FILE: True
-MODE: "demo"  # "train", "eval", "vis", "demo", "batch", see readme.md
+MODE: "eval"  # "train", "eval", "vis", "demo", "batch", see readme.md
 # If you want to train, set MODE to "train", BEGIN_EPOCH to 0, and EXP_NAME to a new name.
 EVAL_AT_BEGIN: False  # do validation before start training
 KEEP_BEST_MODEL: True
+SAVED_WEIGHTS: "MULAN trained on BreastCT with Seg_epoch_16"
 
 SOLVER:
   BASE_LR: 0.004
   WEIGHT_DECAY: 0.0005
   STEPS: [4, 6]
-  MAX_EPOCH: 8
-  IMS_PER_BATCH: 8
+  MAX_EPOCH: 16
+  IMS_PER_BATCH: 4
   WARMUP_ITERS: 0
   CHECKPOINT_PERIOD: 1
   SHOW_LOSS_ITER: 100
   CLIP_GRADIENT: 10.
 
 DATASETS:  # config your dataset paths in paths_catalog.py
-  TRAIN: ["DeepLesion_mini"]
-  VAL: ["DeepLesion_val"]
-  TEST: ["DeepLesion_test"]
+  TRAIN: ["BreastCT_train"]
+  VAL: ["BreastCT_test"] # for eval - change to test; for training - change to val
+  TEST: ["BreastCT_test"]
   TAG:
     SPLIT_FILE: 'text_mined_labels_171_and_split.json'
     USE_CACHE_FILE: "tags_cache.json"
@@ -131,12 +133,12 @@ MODEL:
     DEMOGRAPHIC_FEATURE: False  # sex and age in DeepLesion
 
 TEST:
-  IMS_PER_BATCH: 8
+  IMS_PER_BATCH: 1
   SHUFFLE: True
   POSTPROCESS_ON: False  # currently include removing small lymph nodes. But when evaluating on DeepLesion this is not helpful
   MIN_LYMPH_NODE_DIAM: 5
   # evaluate segmentation and tagging on gt boxes, independent on detection results, like in the MULAN paper
-  EVAL_SEG_TAG_ON_GT: True
+  EVAL_SEG_TAG_ON_GT: False
   COMPUTE_DET_ACC_PER_TAG: False
 
   MASK:
@@ -153,4 +155,4 @@ TEST:
     DETECTIONS_PER_IMG: 5
     SCORE_THRESH: 0.25
     NMS: .3
-  USE_SAVED_PRED_RES: 'proc'  # when debugging evaluation code, use previous prediction results to save time. "none", "raw", or "proc"
+  USE_SAVED_PRED_RES: 'none'  # when debugging evaluation code, use previous prediction results to save time. "none", "raw", or "proc"
