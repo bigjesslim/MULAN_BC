@@ -50,7 +50,7 @@ class MaskPostProcessor(nn.Module):
 
         if self.masker:
             mask_prob = self.masker(mask_prob, boxes)
-
+            
         results = []
         for prob, box in zip(mask_prob, boxes):
             bbox = BoxList(box.bbox, box.size, mode="xyxy")
@@ -189,8 +189,12 @@ class Masker(object):
         # If not we should make it compatible.
         results = []
         for mask, box in zip(masks, boxes):
-            assert mask.shape[0] == len(box), "Number of objects should be the same."
+            assert mask.shape[0] == len(box), "Number of objescts should be the same."
             result = self.forward_single_image(mask, box)
+            # NOTE: Breast CT pipeline modification for interprolation
+            result = torch.nn.functional.interpolate(result, size=(512, 512))
+            result = result.squeeze(1)
+            # NOTE: End of Breast CT modification
             results.append(result)
         return results
 
