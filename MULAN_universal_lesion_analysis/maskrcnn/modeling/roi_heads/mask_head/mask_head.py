@@ -3,7 +3,7 @@ import torch
 from torch import nn
 
 from maskrcnn.structures.bounding_box import BoxList
-
+from maskrcnn.modeling.roi_heads.mask_head.inference import Masker
 from .roi_mask_feature_extractors import make_roi_mask_feature_extractor
 from .roi_mask_predictors import make_roi_mask_predictor
 from .inference import make_roi_mask_post_processor
@@ -73,7 +73,23 @@ class ROIMaskHead(torch.nn.Module):
             result = self.post_processor(mask_logits, proposals)
             return x, result, {}
 
-        loss_mask = self.loss_evaluator(proposals, mask_logits, targets)
+        # NOTE: Breast CT pipeline modification
+        # -> converting features from network layer to actual mask (codes derived from postprocessor)
+        mask_prob = mask_logits.sigmoid()
+        num_masks = mask_logits.shape[0] # 52
+        labels = [bbox.get_field("labels") for bbox in proposals]
+
+        labels = torch.cat(labels).to(torch.int64)
+        index = torch.arange(num_masks, device=labels.device)
+        mask_prob = mask_prob[index, labels][:, None]
+        boxes_per_image = [len(box) for box in proposals]
+        mask_prob = mask_prob.split(boxes_per_image, dim=0)
+
+        mask_threshold = cfg.MODEL.ROI_MASK_HEAD.POSTPROCESS_MASKS_THRESHOLD
+        masker = Masker(threshold=mask_threshold, padding=1)
+        mask_prob = masker(mask_prob, proposals)
+
+        loss_mask = self.loss_evaluator(proposals, mask_prob, targets)
 
         return mask_logits, all_proposals, dict(loss_mask=loss_mask)
 
