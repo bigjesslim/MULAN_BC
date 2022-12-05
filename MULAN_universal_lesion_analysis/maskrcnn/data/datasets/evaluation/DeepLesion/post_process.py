@@ -15,13 +15,15 @@ def post_process_results(result, info):
     if cfg.MODEL.TAG_ON:
         tag_predictions = score2label(result.get_field('tag_scores'), cfg.runtime_info.tag_sel_val)
         result.add_field('tag_predictions', tag_predictions)
-    if cfg.MODEL.MASK_ON:
-        contours, recists, diameters = predict_mask(result, info)
-        # result.extra_fields['mask'] = mask
-        del result.extra_fields['mask']  # delete it to save space
-        result.add_field('contour_mm', contours)
-        result.add_field('recist_mm', recists)
-        result.add_field('diameter_mm', diameters)
+    
+    # TODO: change to new BC format
+    # if cfg.MODEL.MASK_ON:
+    #     contours, recists, diameters = predict_mask(result, info)
+    #     # result.extra_fields['mask'] = mask
+    #     # del result.extra_fields['mask']  # delete it to save space
+    #     result.add_field('contour_mm', contours)
+    #     result.add_field('recist_mm', recists)
+    #     result.add_field('diameter_mm', diameters)
 
     if cfg.TEST.POSTPROCESS_ON:
         do_post_process(result)
