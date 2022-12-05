@@ -1,12 +1,14 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 import torch
 from torch.nn import functional as F
+import torchmetrics
 
 from maskrcnn.layers import smooth_l1_loss
 from maskrcnn.modeling.matcher import Matcher
 from maskrcnn.structures.boxlist_ops import boxlist_iou
 from maskrcnn.modeling.utils import cat
 from maskrcnn.config import cfg
+from maskrcnn.structures.segmentation_mask import SegmentationMask
 
 
 def project_masks_on_boxes(segmentation_masks, proposals, discretization_size):
@@ -57,20 +59,25 @@ class MaskRCNNLossComputation(object):
 
     def match_targets_to_proposals(self, proposal, target):
         match_quality_matrix = boxlist_iou(target, proposal)
-        matched_idxs = self.proposal_matcher(match_quality_matrix)
+        matched_idxs = self.proposal_matcher(match_quality_matrix) # for multiple lesions
+
+        # TODO: change for multiple lesions
+        #matched_idxs = torch.argmax(match_quality_matrix[:-1])
         # Mask RCNN needs "labels" and "masks "fields for creating the targets
         target = target.copy_with_fields(["labels", "masks"])
         # get the targets corresponding GT for each proposal
         # NB: need to clamp the indices because we can have a single
         # GT in the image, and matched_idxs can be -2, which goes
         # out of bounds
-        matched_targets = target[matched_idxs.clamp(min=0)]
+        matched_targets = target[torch.tensor(0).unsqueeze(0)]
+        #matched_targets = target[ matched_idxs.clamp(min=0)] # for multiple lesions
         matched_targets.add_field("matched_idxs", matched_idxs)
         return matched_targets
 
     def prepare_targets(self, proposals, targets):
         labels = []
         masks = []
+        preds = []
         for proposals_per_image, targets_per_image in zip(proposals, targets):
             if len(targets_per_image) > 0:
                 matched_targets = self.match_targets_to_proposals(
@@ -83,8 +90,8 @@ class MaskRCNNLossComputation(object):
 
                 # this can probably be removed, but is left here for clarity
                 # and completeness
-                neg_inds = matched_idxs == Matcher.BELOW_LOW_THRESHOLD
-                labels_per_image[neg_inds] = 0
+                # neg_inds = matched_idxs == Matcher.BELOW_LOW_THRESHOLD
+                # labels_per_image[neg_inds] = 0
 
                 # mask scores are only computed on positive samples
                 positive_inds = torch.nonzero(labels_per_image > 0).squeeze(1)
@@ -94,9 +101,21 @@ class MaskRCNNLossComputation(object):
 
                 positive_proposals = proposals_per_image[positive_inds]
 
-                masks_per_image = project_masks_on_boxes(
-                    segmentation_masks, positive_proposals, self.discretization_size
-                )
+                # NOTE: assumes only one gt 
+                preds.append(positive_inds[0].item())
+
+                if isinstance(segmentation_masks, SegmentationMask):
+                    masks_per_image = project_masks_on_boxes(
+                        segmentation_masks, positive_proposals, self.discretization_size
+                    )
+                else:
+                    # NOTE: BreastCT pipeline additions - interpolating predicted masks to (512,512) for comparison with GT masks
+                    segmentation_masks = segmentation_masks.unsqueeze(0)
+                    segmentation_masks = torch.nn.functional.interpolate(segmentation_masks, size=(512, 512))
+                    segmentation_masks = segmentation_masks[0]
+                    device = proposals[0].bbox.device
+                    masks_per_image = segmentation_masks.to(device, dtype=torch.float32)
+                    # NOTE: End of BreastCT pipeline additions
             else:
                 labels_per_image = torch.zeros(0, dtype=torch.int64).to(proposals_per_image.bbox.device)
                 masks_per_image = torch.zeros(0, self.discretization_size, self.discretization_size,
@@ -104,8 +123,8 @@ class MaskRCNNLossComputation(object):
 
             labels.append(labels_per_image)
             masks.append(masks_per_image)
-
-        return labels, masks
+        
+        return labels, masks, preds  # NOTE: BreastCT pipeline addition of 'preds' variable to return processed prediction masks
 
     def __call__(self, proposals, mask_logits, targets):
         """
@@ -117,10 +136,10 @@ class MaskRCNNLossComputation(object):
         Return:
             mask_loss (Tensor): scalar tensor containing the loss
         """
-        labels, mask_targets = self.prepare_targets(proposals, targets)
+        labels, mask_targets, preds = self.prepare_targets(proposals, targets) # NOTE: BreastCT pipeline addition of 'preds' variable to return processed prediction masks
 
         labels = cat(labels, dim=0)
-        mask_targets = cat(mask_targets, dim=0)
+        mask_targets = cat(mask_targets, dim=0) 
 
         positive_inds = torch.nonzero(labels > 0).squeeze(1)
         labels_pos = labels[positive_inds]
@@ -129,7 +148,34 @@ class MaskRCNNLossComputation(object):
         # accept empty tensors, so handle it separately
         if mask_targets.numel() == 0:
             return mask_logits.sum() * 0
-        mask_loss = dice_loss(mask_logits[positive_inds, labels_pos], mask_targets)
+
+        # NOTE: BreastCT pipeline calculation of segmentation DICE loss for training
+        pred_matched_masks = []
+        mask_targets = mask_targets.int().to(device='cuda:0')
+
+        for i in range(len(mask_logits)):
+            pred_matched_masks.append(mask_logits[i][preds[i]].unsqueeze(0).clone())
+
+        mask_logits = torch.vstack(pred_matched_masks)
+        mask_logits = mask_logits.int().to(device='cuda:0')
+        
+        ## manual computation of DICE loss for BreastCT pipeline - removed
+        # total_mask_loss = 0
+        # for i in range(len(mask_targets)):
+        #     mask_logit = mask_logits[i].unsqueeze(0).to(device='cuda:0')
+        #     mask_target = mask_targets[i].unsqueeze(0)
+        #     print("final shapes")
+        #     print(mask_logit.shape)
+        #     print(mask_target.shape)
+        #     mask_loss = dice_loss( mask_logit, mask_target)
+        #     total_mask_loss += mask_loss
+        # mask_loss = dice_loss(mask_logits, mask_targets)
+        # mask_loss = total_mask_loss/len(mask_targets)
+
+        torch_dice = torchmetrics.functional.dice(mask_logits, mask_targets)
+        mask_loss = 1-torch_dice
+
+        # NOTE: End of BreastCT pipeline modification
 
         # mask_loss = F.binary_cross_entropy_with_logits(
         #     mask_logits[positive_inds, labels_pos], mask_targets
@@ -164,8 +210,14 @@ def dice_loss(input, target):
     #             (iflat.sum() + tflat.sum() + smooth))
 
     # use avg of each smp
+    input_dims = input.dim()
+    target_dims = target.dim()
+    assert input_dims == target_dims
+    dims = (input_dims-2,input_dims-1)
+
     input = input.sigmoid()
-    intersection = (input * target).sum(dim=(1,2))
+    intersection = (input * target).sum(dim=dims)
+
     dice = ((2. * intersection + smooth) /
-                (input.sum(dim=(1,2)) + target.sum(dim=(1,2)) + smooth))
+                (input.sum(dim=dims) + target.sum(dim=dims) + smooth))
     return 1 - dice.mean()
