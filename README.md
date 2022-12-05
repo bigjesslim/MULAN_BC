@@ -97,6 +97,7 @@ Overarching folder = `MULAN_universal_lesion_analysis`
 - Required input: path to a patient’s image nrrd file
 - Outputs: visualizations + logs of detections
     - Visualizations saved to the folder `viz` under a subfolder of the name of the weights used (check weights used in the script `config.yml`)
+- Extent of modification: Mild
 
 Note: `batch_demo_process.py` was left untouched - does not work on nrrd files with Breast CT directory structure
 
@@ -106,15 +107,17 @@ Mainly only modified to accommodate different format of **segmentation** ground-
 
 - In DeepLesion, the full masks of the lesions were not available - polygons were generated from RECIST measurements
 
-`**loss.py**`
+******************************`loss.py`******************************
 
 - Relative path: maskrcnn/modeling/roi_heads/mask_head/loss.py
 - Modified segmentation DICE loss calculation for Breast CT full ground truth format
+- Extent of modification: Mild
 
-`**mask_head.py**`
+******************************`mask_head.py`******************************
 
 - Relative path: maskrcnn/modeling/roi_heads/mask_head/mask_head.py
 - Modified segmentation branch final layer output vector to (512, 512) mask for calculation of DICE loss
+- Extent of modification: Mild
 
 ### Evaluation
 
