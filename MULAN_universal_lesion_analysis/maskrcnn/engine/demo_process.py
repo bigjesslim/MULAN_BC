@@ -4,12 +4,17 @@
 import os
 import numpy as np
 from time import time
+import pickle
 import torch
 import nibabel as nib
 import nrrd
 from tqdm import tqdm
 import cv2
 from openpyxl import load_workbook
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
+# from scipy import interpolate
 
 from maskrcnn.config import cfg
 from maskrcnn.data.datasets.load_ct_img import load_prep_img
@@ -68,7 +73,23 @@ def exec_model(model):
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
 
-        slices_to_process = range(int(slice_num_per_run/2), num_total_slice, slice_num_per_run)
+        # from NRRD files - get patient id (P__)
+        image_fn = path.split("/")[-1]
+        pid = image_fn.split("_")[0]
+
+        # number of slices for each filename is saved in under the pickle file below
+        # load number of slides for each file name into slices_to_process
+        dbfile = open('/home/tester/jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/datasets/lesion_slice_dict.pkl', 'rb')     
+        lesion_slice_dict = pickle.load(dbfile)
+        # get the full range of CT slices to pass thru the model 
+        slices_to_process = lesion_slice_dict[image_fn]
+
+        # load and preprocess mask data (segmentation mask gt)
+        mask_path = "/".join(path.split('/')[:-1]) + "/" + str(pid) + "_mask.nrrd"
+        mask_data = nrrd.read(mask_path)
+        mask, spacing, slice_intv = load_preprocess_nrrd(mask_data, False)
+        mask = np.transpose(mask, (2, 0, 1))
+
         msgs_all = []
         print('predicting ...')
         for slice_idx in tqdm(slices_to_process):
@@ -82,10 +103,80 @@ def exec_model(model):
             info = {'spacing': spacing, 'im_scale': im_scale}
             post_process_results(result[0], info)
             total_time += time() - start_time
-            output_fn = os.path.join(output_dir, '%d.png'%(slice_idx+1))
             overlay, msgs = gen_output(im_np, result[0], info, win_show)
+            
+            # NOTE: This section is modified for the Breast CT scans (NRRD files) pipeline
+            # section: vizualisation pipeline to draw predicted contours + gt contour + gt box
+            # predicted boxes are drawn using the original code in the gen_output function
+            np_lesion = np.argwhere(mask[slice_idx]==1)
+            if len(np_lesion) == 0:
+                continue
+            im_scale = (overlay.shape[1])/(512*2)
+            spacing = im_scale*2
 
-            cv2.imwrite(output_fn, overlay)
+            # 1. drawing predicted segmentations
+            for box in result:
+                pred_masks = box.get_field("mask")
+                for pred_mask in pred_masks:
+                    interpolated_mask = torch.nn.functional.interpolate(pred_mask.unsqueeze(0).unsqueeze(0), scale_factor=spacing)
+                    interpolated_mask = interpolated_mask[0][0].cpu().numpy()
+                    interpolated_mask = np.where(interpolated_mask == 1, 255, interpolated_mask).astype(np.uint8)
+                    idx = cv2.findContours(interpolated_mask,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)[0]
+                    idx = np.array(idx)
+                    
+                    # if contour can be found - draw contour
+                    if idx.ndim == 4: 
+                        idx = np.reshape(idx, (idx.shape[1], 2))
+                        out = np.zeros_like(interpolated_mask)
+                        out[idx[:,1],idx[:,0]] = 255
+                        interpolated_mask = out
+                        interpolated_mask = np.pad(interpolated_mask, pad_width=((0, overlay.shape[0]-overlay.shape[1]), (0, 0)))
+                        interpolated_mask = np.ma.make_mask(interpolated_mask)
+                        overlay[interpolated_mask] = np.array([0,0,255])
+
+            # 2a. getting GT mask 
+            curr_mask = mask[slice_idx].copy()
+            torch_mask = torch.from_numpy(curr_mask.astype("float32"))
+            interpolated_mask = torch.nn.functional.interpolate(torch_mask.unsqueeze(0).unsqueeze(0), scale_factor=spacing)
+            interpolated_mask = interpolated_mask[0][0].cpu().numpy()
+
+            # 2b. getting contour of GT mask
+            interpolated_mask = np.where(interpolated_mask == 1, 255, interpolated_mask).astype(np.uint8)
+            idx = cv2.findContours(interpolated_mask,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)[0]
+            idx = np.array(idx)
+            # if contour is found - draw contour
+            if idx.ndim == 4: 
+                idx = np.reshape(idx, (idx.shape[1], 2))
+                out = np.zeros_like(interpolated_mask)
+                out[idx[:,1],idx[:,0]] = 255
+                interpolated_mask = out
+            # NOTE: else - interpolated_mask stays as the mask and the entire mask will be shaded in the final vizualisation
+        
+            interpolated_mask = np.pad(interpolated_mask, pad_width=((0, overlay.shape[0]-overlay.shape[1]), (0, 0)))
+            interpolated_mask = np.ma.make_mask(interpolated_mask)
+            overlay[interpolated_mask] = np.array([255,0,0])
+
+            ## 2c. draw gt box - changed to drawing contour instead
+            # left = round((min(np_lesion[:, 1])-1)*spacing)
+            # down = round((min(np_lesion[:, 0])-1)*spacing)
+            # right = round((max(np_lesion[:, 1])-1)*spacing)
+            # up = round((max(np_lesion[:, 0])-1)*spacing)
+            #overlay = cv2.rectangle(overlay, (left, down), (right, up), (255, 0, 0), 1)
+        
+
+            # 3. configure directory to save the vizualizations
+            viz_folder = "/home/tester/jessica/MULAN_BC/MULAN_universal_lesion_analysis/viz/" + str(cfg.SAVED_WEIGHTS.split(" ")[-1]) + "/" + str(pid)
+            os.makedirs(viz_folder, exist_ok=True)
+            viz_fn = viz_folder + "/" +  str(slice_idx) + ".png"
+
+            # 3b. plot and save visualizations
+            fig, ax = plt.subplots()
+            ax.imshow(overlay)
+            ax.figure.savefig(viz_fn, dpi=300)
+            #cv2.imwrite(output_fn, overlay)
+
+            ## NOTE: End of modified section
+
             msgs_all.append('slice %d\r\n' % (slice_idx+1))
             for msg in msgs:
                 msgs_all.append(msg+'\r\n')
@@ -133,29 +224,31 @@ def load_preprocess_nifti(data):
         vol = vol[:, ::-1, :]
     return vol, spacing, slice_intv
 
-def load_preprocess_nrrd(data):
-    vol = (data[0].astype('int32') + 32768).astype('uint16')  # to be consistent with png files
+def load_preprocess_nrrd(data, image_conversion=True):
+    if image_conversion:
+        vol = (data[0].astype('int32') + 32768).astype('uint16')  # to be consistent with png files
+    else:
+        vol = data[0]
     # spacing = -data.get_affine()[0,1]
     # slice_intv = -data.get_affine()[2,2]
     aff = data[1]['space directions'][:3, :3]
-    print(aff.shape)
     spacing = np.abs(aff[:2, :2]).max()
     slice_intv = np.abs(aff[2, 2])
 
-    # if np.abs(aff[0, 0]) > np.abs(aff[0, 1]):
-    #     vol = np.transpose(vol, (1, 0, 2))
-    #     aff = aff[[1, 0, 2], :]
-    # if np.max(aff[0, :2]) > 0:
-    #     vol = vol[::-1, :, :]
-    # if np.max(aff[1, :2]) > 0:
-    #     vol = vol[:, ::-1, :]
+    if np.abs(aff[0, 0]) > np.abs(aff[0, 1]):
+        vol = np.transpose(vol, (1, 0, 2))
+        aff = aff[[1, 0, 2], :]
+    if np.max(aff[0, :2]) > 0:
+        vol = vol[::-1, :, :]
+    if np.max(aff[1, :2]) > 0:
+        vol = vol[:, ::-1, :]
 
     return vol, spacing, slice_intv
 
 
 
 def get_ims(slice_idx, vol, spacing, slice_intv):
-    num_slice = cfg.INPUT.NUM_SLICES * cfg.INPUT.NUM_IMAGES_3DCE
+    num_slice = cfg.INPUT.NUM_SLICES * cfg.INPUT.NUM_IMAGES_3DCE # == 9 following the settings in default.py
     im_np, im_scale, crop = load_prep_img(vol, slice_idx, spacing, slice_intv,
                                           cfg.INPUT.IMG_DO_CLIP, num_slice=num_slice)
     im = im_np - cfg.INPUT.PIXEL_MEAN
@@ -182,21 +275,13 @@ def gen_output(im, result, info, win_show):
         tag_scores = None
         tag_predictions = None
 
-    if cfg.MODEL.MASK_ON:
-        mm2pix = info['im_scale'] / info['spacing'] * scale
-        contours = result.get_field('contour_mm').cpu().numpy() * mm2pix
-        contours = [c[c[:, 0] > 0, :] for c in contours]
-        contours = [c+1*scale for c in contours]  # there seems to be a small offset in the mask?
-        recists = result.get_field('recist_mm').cpu().numpy() * mm2pix
-        recists += 1*scale   # there seems to be a small offset in the mask?
-        diameters = result.get_field('diameter_mm').cpu().numpy()
-    else:
-        contours = None
-        recists = None
-        diameters = None
+    # NOTE: contours, recists and diameters not used in new pipeline for Breast CT scans (with mask GT provided)
+    contours = None
+    recists = None
+    diameters = None
 
     pred *= scale
-    overlay, msgs = draw_results(im, pred, labels, scores, tag_predictions=tag_predictions, tag_scores=tag_scores,
+    overlay, msgs = draw_results(im, pred, labels, scores, tag_predictions=tag_predictions, tag_scores=tag_scores, 
                                  contours=contours, recists=recists, diameters=diameters)
     overlay = print_msg_on_img(overlay, msgs)
     return overlay, msgs
@@ -207,12 +292,10 @@ def print_msg_on_img(overlay, msgs):
     msg_im = np.zeros((txt_height*cfg.TEST.VISUALIZE.DETECTIONS_PER_IMG+10, overlay.shape[1], 3), dtype=np.uint8)
     for p in range(len(msgs)):
         msg = msgs[p].split(' | ')
-        print(*msg[0])
-        print(*msg[1])
         if cfg.MODEL.TAG_ON: # detection + segmentation + tagging
             msg = msg[0][7:10] + msg[1][:-2] + ': ' + msg[2]
-        elif cfg.MODEL.MASK_ON: # detection + segmentation
-            msg = msg[0][7:10] + msg[1][:-2]
+        # elif cfg.MODEL.MASK_ON: # detection + segmentation
+        #     msg = msg[0][7:10] + msg[1][:-2]
         else: # just detection
             msg = msg[0][7:10]
         cv2.putText(msg_im, msg, (0, txt_height*(p+1)),
