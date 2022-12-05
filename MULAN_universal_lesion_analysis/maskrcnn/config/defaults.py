@@ -28,14 +28,14 @@ _C = edict()
 
 _C.MODEL = edict()
 _C.MODEL.RPN_ONLY = False
-_C.MODEL.MASK_ON = False
+_C.MODEL.MASK_ON = True
 _C.MODEL.DEVICE = "cuda"
 _C.MODEL.META_ARCHITECTURE = "GeneralizedRCNN"
 
 # If the WEIGHT starts with a catalog://, like :R-50, the code will look for
 # the path in paths_catalog. Else, it will use it as the specified absolute
 # path
-_C.MODEL.WEIGHT = "/home/tester/jessica/MULAN_BC/MULAN_universal_lesion_analysis/MULAN_DeepLesion_epoch_08.pth"
+_C.MODEL.WEIGHT = "/home/tester/jessica/MULAN_BC/MULAN_universal_lesion_analysis/checkpoints/MULAN trained on DeepLesion_epoch_16.pth"
 #_C.MODEL.WEIGHT = "catalog://ImageNetPretrained/MSRA/R-50"
 _C.MODEL.INIT_FROM_PRETRAIN = True
 
@@ -205,7 +205,7 @@ _C.MODEL.ROI_MASK_HEAD.CONV_LAYERS = (256, 256, 256, 256)
 _C.MODEL.ROI_MASK_HEAD.RESOLUTION = 14
 _C.MODEL.ROI_MASK_HEAD.SHARE_BOX_FEATURE_EXTRACTOR = True
 # Whether or not resize and translate masks to the input image.
-_C.MODEL.ROI_MASK_HEAD.POSTPROCESS_MASKS = False
+_C.MODEL.ROI_MASK_HEAD.POSTPROCESS_MASKS = True
 _C.MODEL.ROI_MASK_HEAD.POSTPROCESS_MASKS_THRESHOLD = 0.5
 
 _C.MODEL.ROI_TAG_HEAD = edict()
