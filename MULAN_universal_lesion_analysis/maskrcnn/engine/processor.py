@@ -52,7 +52,8 @@ def train_model():
             extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
             # model.backbone.load_pretrained_weights()
     else:
-        name = checkpointer.get_save_name(cfg.BEGIN_EPOCH, prefix=cfg.FINETUNE_FROM)
+        #name = checkpointer.get_save_name(cfg.BEGIN_EPOCH, prefix=cfg.FINETUNE_FROM)
+        name = os.path.join(checkpointer.save_dir, "{}.pth".format(cfg.SAVED_WEIGHTS))
         extra_checkpoint_data = checkpointer.load(name)
         # if cfg.MODE in ('train',):
         #     arguments.update(extra_checkpoint_data)
