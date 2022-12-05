@@ -11,10 +11,12 @@ import nibabel as nib
 from maskrcnn.config import cfg
 
 
-def load_prep_img(data_dir, imname, spacing, slice_intv, do_clip=False, num_slice=3, is_train=False, load_from_nrrd=False):
+def load_prep_img(data_dir, imname, spacing, slice_intv, do_clip=False, num_slice=3, is_train=False):
     """load volume, windowing, interpolate multiple slices, clip black border, resize according to spacing"""
 
-    im, mask = load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_slice, load_from_nrrd)
+    # NOTE: BreastCT pipeline - permanent no clipping  
+    do_clip = False
+    im, mask = load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_slice)
 
     im = windowing(im, cfg.INPUT.WINDOWING)
 
@@ -47,13 +49,17 @@ def load_prep_img(data_dir, imname, spacing, slice_intv, do_clip=False, num_slic
         im_scale *= im_scale1
 
     if im_scale != 1:
+        if is_train:
+            im_scale = float(im_scale[0])
+        else:
+            im_scale = float(im_scale)
         im = cv2.resize(im, None, None, fx=im_scale, fy=im_scale, interpolation=cv2.INTER_LINEAR)
         # mask = cv2.resize(mask, None, None, fx=im_scale, fy=im_scale, interpolation=cv2.INTER_LINEAR)
 
     return im, im_scale, c
 
 
-def load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_slice, load_from_nrrd):
+def load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_slice):
     data_cache = {}
     def _load_data_from_png(imname, delta=0):
         imname1 = get_slice_name(data_dir, imname, delta)
@@ -69,21 +75,11 @@ def load_multislice_img_16bit_png(data_dir, imname, slice_intv, do_clip, num_sli
         vol = data_dir
         idx = min(vol.shape[2]-1, max(int(imname+delta), 0))
         final_vol = vol[:,:,idx]
-        #print(final_vol.shape)
         return final_vol
 
-    def _load_data_from_nrrd(imname, delta=0): 
-        # data_dir = whole CT volume
-        # imname = chosen slice index
-        vol = data_dir
-        idx = min(vol.shape[2]-1, max(int(imname+delta), 0)) # in case slice index is out of bounds
-        final_vol = vol[:,:,idx]
-        return final_vol
-
-    if load_from_nrrd:
-        _load_data = _load_data_from_nrrd
-    elif isinstance(data_dir, str) and isinstance(imname, str):
+    if isinstance(data_dir, str) and isinstance(imname, str):
         _load_data = _load_data_from_png
+    # NOTE: BreastCT pipeline - follows _load_data_from_nifti which basically loads the data from a np array
     elif isinstance(data_dir, np.ndarray) and isinstance(imname, int):
         _load_data = _load_data_from_nifti
 
