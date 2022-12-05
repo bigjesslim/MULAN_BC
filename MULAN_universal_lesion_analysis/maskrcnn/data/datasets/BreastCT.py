@@ -62,6 +62,7 @@ class BreastCTDataset(object):
 
         # 4. Use lesion_slice_dict to get slices for each file with lesions 
         # -> which forms image_fn_list = the list of CT slices (filename + slice index) -> forms the dataset
+        # regenerate new lesion_slice dict for new dataset using gen_lesion_slice_dict.py
         lesion_ct_slices = []
         for image_fn in self.image_fn_list:
             for i in lesion_slice_dict[image_fn]:
