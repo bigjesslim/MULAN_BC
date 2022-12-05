@@ -9,36 +9,46 @@ import os
 
 
 class DatasetCatalog(object):
-    DATA_DIR = "/home/tester/"
+    DATA_DIR = "/home/tester/jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/"
     DATASETS = {
         "DeepLesion_train": {
-            "data_dir": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/Images_png",
+            "data_dir": "DeepLesion/Images_png",
             "split": "train",
             "ann_file": "DeepLesion/DL_info.csv",
         },
         "DeepLesion_val": {
-            "data_dir": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/Images_png",
+            "data_dir": "DeepLesion/Images_png",
             "split": "val",
-            "ann_file": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/DL_info.csv"
+            "ann_file": "DeepLesion/DL_info.csv"
         },
         "DeepLesion_test": {
-            "data_dir": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/Images_png",
+            "data_dir": "DeepLesion/Images_png",
             "split": "test",
-            "ann_file": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/DL_info.csv"
+            "ann_file": "DeepLesion/DL_info.csv"
         },
         "DeepLesion_small": {  # for debug
-            "data_dir": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/Images_png",
+            "data_dir": "DeepLesion/Images_png",
             "split": "small",
             "ann_file": "DeepLesion/DL_info.csv"
         },
         "DeepLesion_mini": {  # for debug
-            "data_dir": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/minideeplesion",
+            "data_dir": "DeepLesion/minideeplesion",
             "split": "small",
-            "ann_file": "jessica/MULAN_BC/MULAN_universal_lesion_analysis/maskrcnn/data/DeepLesion/DL_info.csv"
+            "ann_file": "DeepLesion/DL_info.csv"
         },
-        "BC_old_data":{
-            "data_dir": "Data",
+        "BreastCT_train":{
+            "data_dir": "Data/new data",
             "split": "train",
+            "ann_file": None
+        },
+        "BreastCT_test":{
+            "data_dir": "Data/new data",
+            "split": "test",
+            "ann_file": None
+        },
+        "BreastCT_val":{
+            "data_dir": "Data/new data",
+            "split": "val",
             "ann_file": None
         }
     }
@@ -55,6 +65,18 @@ class DatasetCatalog(object):
             )
             return dict(
                 factory="DeepLesionDataset",
+                args=args,
+            )
+        if "BreastCT" in name:
+            data_dir = "/home/tester/"
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                split=attrs["split"],
+                data_dir=os.path.join(data_dir, attrs["data_dir"]),
+                ann_file=None
+            )
+            return dict(
+                factory="BreastCTDataset",
                 args=args,
             )
         raise RuntimeError("Dataset not available: {}".format(name))
