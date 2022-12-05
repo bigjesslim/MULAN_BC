@@ -111,8 +111,10 @@ def make_datasets(split):
         "maskrcnn.config.paths_catalog", cfg.PATHS_CATALOG, True
     )
     DatasetCatalog = paths_catalog.DatasetCatalog
-    # dataset_list = cfg.DATASETS.TRAIN if is_train else cfg.DATASETS.TEST
-    dataset_list = eval('cfg.DATASETS.' + split.upper())
+    # NOTE: Breast CT modification - note that only train and test datasets are used 
+    # Finetuning (e.g., k-fold validation) was not performed hence eval dataset was not used
+    dataset_list = cfg.DATASETS.TRAIN if is_train else cfg.DATASETS.TEST
+    # dataset_list = eval('cfg.DATASETS.' + split.upper()) # previously for deeplesion - training conducted on all datasets
 
     transforms = build_transforms(is_train)
     datasets = build_dataset(dataset_list, transforms, DatasetCatalog, is_train)
