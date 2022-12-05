@@ -40,7 +40,7 @@ def do_evaluation(
 
     return  simple_sens
 
-# NOTE: Breast CT pipeline addition - evaluation of segmentation by calculating DICE score 
+# NOTE: Breast CT pipeline addition - function for evaluation of segmentation by calculating DICE score 
 def eval_BC_segmentation(predictions, logger):
     fns = sorted(predictions.keys())
     all_masks = [predictions[fn]['result'].get_field('mask').cpu().numpy() for fn in fns]
@@ -57,7 +57,6 @@ def eval_BC_segmentation(predictions, logger):
 
     all_chosen_masks = np.vstack(all_chosen_masks)
     all_chosen_masks = torch.from_numpy(all_chosen_masks.astype('uint8'))
-    print(all_chosen_masks.shape)
 
     final_gt_masks = []
     for mask in all_gt_masks:
@@ -68,16 +67,7 @@ def eval_BC_segmentation(predictions, logger):
     
     all_gt_masks = np.vstack(final_gt_masks)
     all_gt_masks = torch.from_numpy(all_gt_masks.astype('uint8'))
-    print(all_gt_masks.shape)
     assert all_chosen_masks.shape == all_gt_masks.shape
-
-    num_identical = 0
-    for i in range(0, all_gt_masks.shape()[0]):
-        if all_gt_masks[i] == all_chosen_masks[i]:
-            num_identical += 1
-
-    print("number of identical masks:")
-    print(num_identical)
 
     torch_dice = torchmetrics.functional.dice(all_chosen_masks, all_gt_masks)
     logger.info('segmentation dice coefficient: %.4f', torch_dice)
