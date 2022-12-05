@@ -84,8 +84,10 @@ def main():
     if cfg.MODE in ('batch',):
         batch_exec_model(model)
     else:
-        test_model(model, is_validation=True)
-        test_model(model, is_validation=False)
+        # TODO: mimick this code to do k-fold validation on validation set
+        test_model(model, is_validation=True) # on validation set
+        if cfg.MODEL.TAG_ON:
+            test_model(model, is_validation=False) # test set
     logger.info('Completed at %s: %s', time.strftime('%m-%d_%H-%M-%S'), cfg.EXP_NAME)
 
 
