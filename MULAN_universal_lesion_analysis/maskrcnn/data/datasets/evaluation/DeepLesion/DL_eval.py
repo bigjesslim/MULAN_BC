@@ -5,8 +5,9 @@ import logging
 import numpy as np
 from scipy.spatial.distance import cdist
 import torch
+import torchmetrics
 
-from .detection_eval import sens_at_FP
+from .detection_eval import sens_at_FP, avg_sens_only,  avg_iou_dice_conf
 from .tagging_eval import compute_all_acc_wt, compute_thresholds, print_accs
 from maskrcnn.config import cfg
 from maskrcnn.utils.print_info import save_acc_to_file
@@ -27,19 +28,62 @@ def do_evaluation(
             predictions[fn]['gt_result'] = predictions[fn]['result'][is_gt]
             predictions[fn]['result'] = predictions[fn]['result'][~is_gt]
 
-    # lesion detection (lesion vs. non-lesion)
-    det_res = eval_DL_detection(predictions, logger, is_validation)
+    # NOTE: Breast CT - modification to include more metrics
+    simple_sens = eval_DL_detection(predictions, logger, is_validation)
 
     # multi-label lesion tagging
     if cfg.MODEL.TAG_ON:
         tag_res = eval_DL_tagging(predictions, logger, is_validation)
 
-    # weakly-supervised segmentation
     if cfg.MODEL.MASK_ON:
-        logger.info('\nSegmentation accuracy:')
-        seg_res = eval_DL_segmentation(predictions, logger)
+        seg_res = eval_BC_segmentation(predictions, logger)
 
-    return np.mean(det_res[:4])
+    return  simple_sens
+
+# NOTE: Breast CT pipeline addition - evaluation of segmentation by calculating DICE score 
+def eval_BC_segmentation(predictions, logger):
+    fns = sorted(predictions.keys())
+    all_masks = [predictions[fn]['result'].get_field('mask').cpu().numpy() for fn in fns]
+    all_gt_masks = [predictions[fn]['target'].get_field('masks').cpu().numpy() for fn in fns]
+    all_scores = [predictions[fn]['result'].get_field('scores').numpy() for fn in fns]
+
+    all_chosen_masks = []
+    for score, mask in zip(all_scores, all_masks):
+        if len(score)==0:
+            all_chosen_masks.append(torch.zeros((1, 512, 512)))
+        else:
+            max_conf_idx = np.argmax(score)
+            all_chosen_masks.append([mask[max_conf_idx]])
+
+    all_chosen_masks = np.vstack(all_chosen_masks)
+    all_chosen_masks = torch.from_numpy(all_chosen_masks.astype('uint8'))
+    print(all_chosen_masks.shape)
+
+    final_gt_masks = []
+    for mask in all_gt_masks:
+        gt_mask = np.array(mask)
+        gt_mask = torch.from_numpy(gt_mask.astype('uint8'))
+        gt_mask = torch.nn.functional.interpolate(gt_mask.unsqueeze(0), size=(512, 512))
+        final_gt_masks.append(gt_mask[0])
+    
+    all_gt_masks = np.vstack(final_gt_masks)
+    all_gt_masks = torch.from_numpy(all_gt_masks.astype('uint8'))
+    print(all_gt_masks.shape)
+    assert all_chosen_masks.shape == all_gt_masks.shape
+
+    num_identical = 0
+    for i in range(0, all_gt_masks.shape()[0]):
+        if all_gt_masks[i] == all_chosen_masks[i]:
+            num_identical += 1
+
+    print("number of identical masks:")
+    print(num_identical)
+
+    torch_dice = torchmetrics.functional.dice(all_chosen_masks, all_gt_masks)
+    logger.info('segmentation dice coefficient: %.4f', torch_dice)
+    return torch_dice
+
+
 
 
 def eval_DL_detection(predictions, logger, is_validation):
@@ -51,16 +95,25 @@ def eval_DL_detection(predictions, logger, is_validation):
 
     # detection
     logger.info('\nDetection accuracy:')
-    logger.info('Sensitivity @ %s average FPs per image:', str(cfg.TEST.VAL_FROC_FP))
 
+    # NOTE: for DeepLesion - not suited for BC where we assume 1 lesion per image
+    logger.info('Sensitivity @ %s average FPs per image:', str(cfg.TEST.VAL_FROC_FP))
     det_res = sens_at_FP(all_boxes, all_gts, cfg.TEST.VAL_FROC_FP, cfg.TEST.IOU_TH)  # cls 0 is background
     logger.info(', '.join(['%.4f'%v for v in det_res]))
     logger.info('mean of %s: %.4f', str(cfg.TEST.VAL_FROC_FP[:4]), np.mean(det_res[:4]))
 
+    # NOTE: Breast CT modification - addition of more metrics into the logs
+    simple_sens = avg_sens_only(all_boxes, all_gts, cfg.TEST.IOU_TH)
+    logger.info('average sensitivity: %.4f', simple_sens)
+    iou_over_TPs, conf_over_TPs, avg_dice_over_TPs = avg_iou_dice_conf(all_boxes, all_gts, cfg.TEST.IOU_TH)
+    logger.info('average IOU over TP instances: %.4f', iou_over_TPs)
+    logger.info('average Dice coeff over TP instances: %.4f', avg_dice_over_TPs)
+    logger.info('average confidences over TP instances: %.4f', conf_over_TPs)
+
     # detection accuracy per tag
     compute_det_acc_per_tag = cfg.TEST.COMPUTE_DET_ACC_PER_TAG
-    cfg.runtime_info.det_acc_per_tag = np.empty((cfg.runtime_info.num_tags, len(cfg.TEST.VAL_FROC_FP)), dtype=float)
     if compute_det_acc_per_tag and is_validation and cfg.MODEL.TAG_ON:
+        cfg.runtime_info.det_acc_per_tag = np.empty((cfg.runtime_info.num_tags, len(cfg.TEST.VAL_FROC_FP)), dtype=float)
         logger.info('\nComputing detection accuracy per tag:')
         for i, t in enumerate(cfg.runtime_info.tag_list):
             tag_mask = {fn: predictions[fn]['target'].get_field('tags')[:, i] == 1 for fn in fns}
@@ -71,7 +124,7 @@ def eval_DL_detection(predictions, logger, is_validation):
                 logger.info('%d, ', i)
         logger.info('\n')
 
-    return det_res
+    return simple_sens
 
 
 def eval_DL_tagging(predictions, logger, is_validation):
