@@ -4,7 +4,7 @@ GPU: '0'  # if "", choose the idlest GPU
 BEGIN_EPOCH: 11 # if = 0, start new training process; if > 0, load previous checkpoint according to FINETUNE_FROM
 # NOTE: EXP_NAME and BEGIN_EPOCH sets the checkpoint to load from 
 LOG_IN_FILE: True
-MODE: "eval"  # "train", "eval", "vis", "demo", "batch", see readme.md
+MODE: "demo"  # "train", "eval", "vis", "demo", "batch", see readme.md
 # If you want to train, set MODE to "train", BEGIN_EPOCH to 0, and EXP_NAME to a new name.
 EVAL_AT_BEGIN: False  # do validation before start training
 KEEP_BEST_MODEL: True
