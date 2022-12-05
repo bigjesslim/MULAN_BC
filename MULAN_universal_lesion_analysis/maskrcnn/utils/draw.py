@@ -82,14 +82,15 @@ def visualize(im, target, result, info, masker):
     tag_scores = result.get_field('tag_scores').cpu().numpy()
     tag_predictions = result.get_field('tag_predictions').cpu().numpy()
 
+    # TODO: Change for BC 
     # if cfg.MODEL.MASK_ON and len(result.get_field('contour_mm')) > 0:
-    mm2pix = info['im_scale'] / info['spacing'] * scale
-    contours = result.get_field('contour_mm').cpu().numpy() * mm2pix
-    contours = [c[c[:,0]>0, :] for c in contours]
-    contours = [c+1*scale for c in contours]  # there seems to be a small offset in the mask?
-    recists = result.get_field('recist_mm').cpu().numpy() * mm2pix
-    recists += 1*scale   # there seems to be a small offset in the mask?
-    diameters = result.get_field('diameter_mm').cpu().numpy()
+    #     mm2pix = info['im_scale'] / info['spacing'] * scale
+    #     contours = result.get_field('contour_mm').cpu().numpy() * mm2pix
+    #     contours = [c[c[:,0]>0, :] for c in contours]
+    #     contours = [c+1*scale for c in contours]  # there seems to be a small offset in the mask?
+    #     recists = result.get_field('recist_mm').cpu().numpy() * mm2pix
+    #     recists += 1*scale   # there seems to be a small offset in the mask?
+    #     diameters = result.get_field('diameter_mm').cpu().numpy()
 
     pred *= scale
     overlay, msgs = draw_results(overlay, pred, labels, scores, tag_predictions=tag_predictions, tag_scores=tag_scores,

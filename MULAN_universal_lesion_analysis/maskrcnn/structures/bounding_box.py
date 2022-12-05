@@ -205,7 +205,7 @@ class BoxList(object):
     def __getitem__(self, item):
         bbox = BoxList(self.bbox[item], self.size, self.mode)
         for k, v in self.extra_fields.items():
-            bbox.add_field(k, v[item])
+            bbox.add_field(k, v[item.to(dtype=torch.long)])
         return bbox
 
     def __len__(self):

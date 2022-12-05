@@ -1,4 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+from ast import Set
 import logging
 import os
 
@@ -69,11 +70,15 @@ class Checkpointer(object):
             return {}
         self.logger.info("Loading checkpoint from {}".format(f))
         checkpoint = self._load_file(f)
+        # print(*checkpoint['optimizer']['param_groups'])
         self._load_model(checkpoint)
         self.logger.warning('optimizer and scheduler not loaded from checkpoint file')
         if "optimizer" in checkpoint and self.optimizer:
             self.logger.info("Loading optimizer from {}".format(f))
-            self.optimizer.load_state_dict(checkpoint.pop("optimizer"))
+            try:
+                self.optimizer.load_state_dict(checkpoint.pop("optimizer"))
+            except:
+                pass
         if "scheduler" in checkpoint and self.scheduler:
             self.logger.info("Loading scheduler from {}".format(f))
             self.scheduler.load_state_dict(checkpoint.pop("scheduler"))
@@ -102,7 +107,9 @@ class Checkpointer(object):
             f.write(last_filename)
 
     def _load_file(self, f):
-        return torch.load(f, map_location=torch.device("cpu"))
+        # switched map_location to GPU0
+        return torch.load(f, map_location=torch.device('cuda:0'))
+        #return torch.load(f, map_location=torch.device("cpu"))
 
     def _load_model(self, checkpoint):
         load_state_dict(self.model, checkpoint.pop("model"))
