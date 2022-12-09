@@ -42,7 +42,9 @@ Documentation for modifications done to the [original MULAN code repository](htt
 | Weight | Average sensitivity  | Average sensitivity accounting for FPs* | Average confidence (over TP instances) | Average DICE coefficient (over TP instances) | Average IOU     (over TP instances) | Average DICE coefficient (over TP detections) |
 | Pretrained | 0.6837 | 0.4476 | 0.7741 | 0.8412 | 0.7260 | - |
 | Finetuned (6 epochs without segmentation) | 0.9457 | 0.8411 | 0.8960 | 0.8622 | 0.7579 | - |
-| Finetuned (8 epochs with segmentation)  | 0.9531 | 0.8597 | 0.8923 | 0.8641 | 0.7607 | 0.9967 |
+| Finetuned (8 epochs with segmentation)  | 0.9531 | 0.8597 | 0.8923 | 0.8641 | 0.7607 | 0.9967* |
+
+* Average DICE coefficient for segmentation is suspiciously high (however I have insufficient time to debug it - will work on it after my exchange) 
 
 Weight names (for use)
 
